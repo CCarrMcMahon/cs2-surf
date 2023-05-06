@@ -1,2 +1,6 @@
-# cs2-surf
-An open source plugin for surfing in CS2
+# CS2-Surf
+## Description
+An open source plugin for surfing in CS2.
+
+## Status: Preparation
+This repository is being created in preparation for the release of CS2.
