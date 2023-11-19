@@ -8,6 +8,6 @@ if builder.cxx.like('gcc'):
 
 program = builder.cxx.Program('sample')
 program.sources += [
-    'main.cpp',
+    'sample_mm.cpp'
 ]
 builder.Add(program)
