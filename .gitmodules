@@ -6,10 +6,10 @@
 [submodule "metamod-source"]
 	path = metamod-source
 	url = git@github.com:alliedmodders/metamod-source.git
-    branch = master
+	branch = master
     ignore = dirty
 [submodule "ambuild"]
 	path = ambuild
 	url = git@github.com:alliedmodders/ambuild.git
-    branch = master
+	branch = master
     ignore = dirty
