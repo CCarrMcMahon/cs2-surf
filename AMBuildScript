@@ -1,13 +1,160 @@
-# vim: set sts=4 ts=8 sw=4 tw=99 et ft=python:
-builder.cxx = builder.DetectCxx()
-if builder.cxx.like('gcc'):
-    builder.cxx.cflags += [
-        '-Wall',
-        '-Werror'
-    ]
+import pathlib
+from pathlib import Path
+from ambuild2.frontend.v2_2.context import BuildContext
+from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
 
-program = builder.cxx.Program('sample')
-program.sources += [
-    'sample_mm.cpp'
+"""
+Only supports Windows MSVC for now
+TODO: Support GCC
+TODO: Support Linux
+TODO: Support other cpu architectures
+TODO: Add AMBuilder.py file
+TODO: Add PackageScript.py file
+"""
+
+build_context: BuildContext = builder
+
+
+PLUGIN_NAME = "cs2-surf"
+PLUGIN_ALIAS = "cs2-surf"
+ROOT_DIR = pathlib.Path(build_context.sourcePath).resolve()
+METAMOD_SOURCE_DIR = ROOT_DIR.joinpath("metamod-source").resolve()
+HL2SDK_CS2_DIR = ROOT_DIR.joinpath("hl2sdk-cs2").resolve()
+SRC_DIR = ROOT_DIR.joinpath("src").resolve()
+CPU_ARCH = "x86_64"
+
+plugin_name = PLUGIN_NAME
+plugin_alias = PLUGIN_ALIAS
+
+if build_context.options.plugin_name != "":
+    plugin_name = build_context.options.plugin_name
+
+if build_context.options.plugin_alias != "":
+    plugin_alias = build_context.options.plugin_alias
+
+cxx: CliCompiler = build_context.DetectCxx(target_arch=CPU_ARCH)
+if not cxx.like("msvc"):
+    raise SystemExit("Plugin currently only supports the MSVC compiler.")
+
+# Optimization
+if build_context.options.optimize:
+    cxx.cflags += ["/Ox", "/Zo"]
+    cxx.defines += ["NDEBUG"]
+    cxx.linkflags += ["/OPT:ICF", "/OPT:REF"]
+
+# Debugging
+if build_context.options.debug:
+    cxx.cflags += ["/MTd", "/Od", "/RTC1"]
+    cxx.defines += ["DEBUG", "_DEBUG"]
+    cxx.linkflags += ["/NODEFAULTLIB:libcmt"]
+else:
+    cxx.cflags += ["/MT", "/W3", "/Zi"]
+    cxx.defines += [
+        "_CRT_SECURE_NO_DEPRECATE",
+        "_CRT_SECURE_NO_WARNINGS",
+        "_CRT_NONSTDC_NO_DEPRECATE",
+    ]
+    cxx.linkflags += [
+        "/SUBSYSTEM:WINDOWS",
+        "kernel32.lib",
+        "user32.lib",
+        "gdi32.lib",
+        "winspool.lib",
+        "comdlg32.lib",
+        "advapi32.lib",
+        "shell32.lib",
+        "ole32.lib",
+        "oleaut32.lib",
+        "uuid.lib",
+        "odbc32.lib",
+        "odbccp32.lib",
+    ]
+    cxx.cxxflags += ["/TP"]
+
+# Standard
+cxx.cflags += ["/Oy-"]
+cxx.defines += [
+    "WIN32",
+    "_WINDOWS",
+    "SE_CS2=25",
+    "SOURCE_ENGINE=25",
+    "COMPILER_MSVC",
+    "COMPILER_MSVC64",
+    "X64BITS",
+    "PLATFORM_64BITS",
+    "META_IS_SOURCE2",
 ]
-builder.Add(program)
+cxx.linkflags += [
+    str(HL2SDK_CS2_DIR.joinpath("lib", "public", "win64", "interfaces.lib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("lib", "public", "win64", "mathlib.lib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("lib", "public", "win64", "steam_api64.lib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("lib", "public", "win64", "tier0.lib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("lib", "public", "win64", "tier1.lib").resolve()),
+]
+if cxx.version >= 1900:
+    cxx.linkflags += ["legacy_stdio_definitions.lib"]
+cxx.cxxincludes += [
+    str(ROOT_DIR),
+    str(METAMOD_SOURCE_DIR.joinpath("core").resolve()),
+    str(METAMOD_SOURCE_DIR.joinpath("core", "sourcehook").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("common").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "engine").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "mathlib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "vstdlib").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "tier0").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "tier1").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "game", "server").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("game", "server").resolve()),
+]
+cxx.cxxflags += ["/std:c++17"]
+
+# Build
+binary = cxx.Library(plugin_name)
+cpp_node = build_context.Add(binary)
+
+# Builder
+cxx.cxxincludes += [
+    str(SRC_DIR),
+    str(HL2SDK_CS2_DIR),
+    str(HL2SDK_CS2_DIR.joinpath("public", "entity2").resolve()),
+]
+
+binary.sources += [
+    str(SRC_DIR.joinpath("sample_mm.cpp").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("entity2", "entitysystem.cpp").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("tier1", "generichash.cpp").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("tier1", "convar.cpp").resolve()),
+    str(HL2SDK_CS2_DIR.joinpath("public", "tier0", "memoverride.cpp").resolve()),
+]
+
+# Packaging
+ADDONS_METAMOD_DIR = ROOT_DIR.joinpath("addons", "metamod").resolve()
+PLUGIN_BIN_DIR = ROOT_DIR.joinpath("addons", plugin_name, "bin", "win64").resolve()
+
+# build_context.SetBuildFolder("package")
+bin_dir = build_context.AddFolder(str(PLUGIN_BIN_DIR))
+
+vdf_path = pathlib.Path(build_context.buildPath).joinpath(f"{plugin_name}.vdf").resolve()
+with open(vdf_path, "w", encoding="utf-8") as f:
+    f.write('"Metamod Plugin"\n')
+    f.write("{\n")
+    f.write(f'\t"alias"\t"{plugin_alias}"\n')
+    f.write(f'\t"file"\t"{PLUGIN_BIN_DIR.joinpath(plugin_name).resolve()}"\n')
+    f.write("}\n")
+
+build_context.AddCopy(cpp_node.binary, bin_dir)
+# build_context.AddCopy(vdf_path.name, str(ADDONS_METAMOD_DIR))
+breakpoint()
+
+
+# BuildScripts = ["AMBuilder", "PackageScript"]
+
+# build_context.Build(BuildScripts)
+
+
+# program = buildContext.cxx.Program('sample')
+# program.sources += [
+#     'sample_mm.cpp'
+# ]
+# buildContext.Add(program)
