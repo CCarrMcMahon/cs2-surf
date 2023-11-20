@@ -10,14 +10,14 @@ builder = run.BuildParser(sourcePath=sys.path[0], api=API_VERSION)
 builder.options.add_argument(
     "--plugin_name",
     type=str,
-    default="",
+    default="cs2-surf",
     help="The overall name of the plugin.",
 )
 builder.options.add_argument(
     "--plugin_alias",
     type=str,
     default="",
-    help="An alias used in metaplugins.ini for the name of the plugin.",
+    help="An alias for the name of the plugin to appear in the metaplugins.ini file.",
 )
 builder.options.add_argument(
     "--debug",
