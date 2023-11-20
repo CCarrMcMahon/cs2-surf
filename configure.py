@@ -1,4 +1,3 @@
-# vim: set sts=4 ts=8 sw=4 tw=99 et:
 API_VERSION = '2.2.4'
 
 import sys
@@ -11,5 +10,29 @@ except:
     sys.stderr.write('http://www.alliedmods.net/ambuild\n')
     sys.exit(1)
 
-builder = run.BuildParser(sourcePath = sys.path[0], api=API_VERSION)
+builder = run.BuildParser(sourcePath=sys.path[0], api=API_VERSION)
+builder.options.add_argument(
+    "--plugin_name",
+    type=str,
+    default="",
+    help="The overall name of the plugin.",
+)
+builder.options.add_argument(
+    "--plugin_alias",
+    type=str,
+    default="",
+    help="An alias used in metaplugins.ini for the name of the plugin.",
+)
+builder.options.add_argument(
+    "--debug",
+    action="store_true",
+    default=False,
+    help="Include to enable debugging symbols.",
+)
+builder.options.add_argument(
+    "--optimize",
+    action="store_true",
+    default=False,
+    help="Include to enable compiler optimizations.",
+)
 builder.Configure()
