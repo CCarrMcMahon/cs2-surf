@@ -1,11 +1,29 @@
+from enum import StrEnum
 import pathlib
 from pathlib import Path
 from ambuild2.frontend.v2_2.context import BuildContext
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
 
 
+class CompilerAttrs(StrEnum):
+    INCLUDES = "includes"
+    CXX_INCLUDES = "cxxincludes"
+    C_FLAGS = "cflags"
+    CXX_FLAGS = "cxxflags"
+    DEFINES = "defines"
+    CXX_DEFINES = "cxxdefines"
+    C_ONLY_FLAGS = "c_only_flags"
+    RC_DEFINES = "rcdefines"
+    LINK_FLAGS = "linkflags"
+    POST_LINK = "postlink"
+    SOURCE_DEPS = "sourcedeps"
+    WEAK_LINK_DEPS = "weaklinkdeps"
+    LINK_DEPS = "linkdeps"
+
+
 class MetamodSourcePlugin:
     """A class with variables and functions related to the plugin."""
+
     context: BuildContext
     name: str
     alias: str
@@ -17,6 +35,7 @@ class MetamodSourcePlugin:
         self.context = context
         self.__parse_context_options()
         self.set_compiler()
+        self.compiler_set_defaults()
 
     def __parse_context_options(self) -> None:
         """A private helper method to parse custom plugin arguments."""
@@ -63,5 +82,79 @@ class MetamodSourcePlugin:
             raise SystemExit("This plugin currently only supports being built with MSVC.")
 
         self.compiler = compiler
+
+    def compiler_set_attrs(self, attr_name: CompilerAttrs, *args: str) -> None:
+        """Sets a list of string arguments to a compiler attribute."""
+        value = []
+        value.extend([str(arg) for arg in args])
+        setattr(self.compiler, attr_name, value)
+
+    def compiler_add_attrs(self, attr_name: CompilerAttrs, *args: str) -> None:
+        """Adds a list of string arguments to a compiler attribute."""
+        value: list[str] = getattr(self.compiler, attr_name)
+        value.extend([str(arg) for arg in args])
+        setattr(self.compiler, attr_name, value)
+
+    def compiler_add_debug(self) -> None:
+        """A debug related attributes to the compiler."""
+        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/MTd", "/Od", "/RTC1")
+        self.compiler_add_attrs(CompilerAttrs.DEFINES, "DEBUG", "_DEBUG")
+        self.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, "/NODEFAULTLIB:libcmt")
+
+    def compiler_add_optimization(self) -> None:
+        """A optimization related attributes to the compiler."""
+        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/Ox", "/Zo")
+        self.compiler_add_attrs(CompilerAttrs.DEFINES, "NDEBUG")
+        self.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, "/OPT:ICF", "/OPT:REF")
+
+    def compiler_set_defaults(self) -> None:
+        """Clears compiler attributes and sets default values."""
+        # Clear attributes
+        for attr_name in CompilerAttrs:
+            self.compiler_set_attrs(attr_name)
+
+        # Add debug related attributes
+        if self.debug:
+            self.compiler_add_debug()
+        else:
+            self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/MT")
+
+        # Add optimization related attributes
+        if self.optimize:
+            self.compiler_add_optimization()
+
+        # Add standard attributes
+        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/W3", "/Zi", "/std:c++17", "/Oy-")
+        self.compiler_add_attrs(CompilerAttrs.CXX_FLAGS, "/TP")
+        self.compiler_add_attrs(
+            CompilerAttrs.DEFINES,
+            "_CRT_SECURE_NO_DEPRECATE",
+            "_CRT_SECURE_NO_WARNINGS",
+            "_CRT_NONSTDC_NO_DEPRECATE",
+            "WIN32",
+            "_WINDOWS",
+        )
+        self.compiler_add_attrs(
+            CompilerAttrs.LINK_FLAGS,
+            "/SUBSYSTEM:WINDOWS",
+            "kernel32.lib",
+            "user32.lib",
+            "gdi32.lib",
+            "winspool.lib",
+            "comdlg32.lib",
+            "advapi32.lib",
+            "shell32.lib",
+            "ole32.lib",
+            "oleaut32.lib",
+            "uuid.lib",
+            "odbc32.lib",
+            "odbccp32.lib",
+        )
+
+    def compiler_display_attrs(self) -> None:
+        """Display the value of all compiler attributes."""
+        for attr_name in CompilerAttrs:
+            print(f"{attr_name}: {getattr(self.compiler, attr_name)}")
+
 
 plugin = MetamodSourcePlugin(builder)
