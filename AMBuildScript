@@ -41,7 +41,7 @@ class MetamodSourcePlugin:
 
         Currently, only Windows x86_64 MSVC is supported.
         """
-        platform = platform.lower().strip()
+        platform = platform.lower().strip()  # Platform not supported by AMBuild
         arch = arch.lower().strip()
         abi = abi.lower().strip()
         args = [platform, arch, abi]
