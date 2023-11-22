@@ -2,6 +2,7 @@ from enum import StrEnum
 import pathlib
 from pathlib import Path
 from ambuild2.frontend.v2_2.context import BuildContext
+from ambuild2.frontend.v2_2.cpp.builders import BinaryBuilder
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
 from ambuild2.frontend.v2_2.tools.protoc import Protoc, ProtocJob
 
@@ -34,13 +35,36 @@ class MetamodSourcePlugin:
     game_name: str
     compiler: CliCompiler
     protoc_job: ProtocJob
+    binary: BinaryBuilder
 
     def __init__(self, context: BuildContext) -> None:
         self.context = context
         self.root_path = pathlib.Path(context.sourcePath).resolve()
         self.__parse_context_options()
-        # self.set_compiler()
-        # self.compiler_set_defaults()
+        self.set_compiler()
+        self.set_protoc()
+        self.set_binary()
+        self.compiler_set_defaults()
+        self.protoc_set_defaults()
+        self.binary_set_defaults()
+        self.add_binaries()
+        self.compiler_display_attrs()
+        print(self.protoc_job.sources)
+        print(self.protoc_job.protoc.includes)
+        print(self.binary.sources)
+        print(self.binary.custom)
+
+    def get_path(self, *args: str) -> Path:
+        return pathlib.Path(*args).resolve()
+
+    def get_path_from_root(self, *args: str) -> Path:
+        return self.get_path(self.root_path, *args)
+
+    def get_path_from_mss(self, *args: str) -> Path:
+        return self.get_path(self.mms_path, *args)
+
+    def get_path_from_hl2sdk(self, *args: str) -> Path:
+        return self.get_path(self.hl2sdk_path, *args)
 
     def __parse_context_options(self) -> None:
         """A private helper method to parse custom plugin arguments."""
@@ -69,10 +93,10 @@ class MetamodSourcePlugin:
         hl2sdk_path = pathlib.Path(hl2sdk_path_str)
 
         if not mms_path.is_absolute():
-            mms_path = self.root_path.joinpath(mms_path).resolve()
+            mms_path = self.get_path_from_root(mms_path)
 
         if not hl2sdk_path.is_absolute():
-            hl2sdk_path = self.root_path.joinpath(hl2sdk_path).resolve()
+            hl2sdk_path = self.get_path_from_root(hl2sdk_path)
 
         if game_name == "":
             if hl2sdk_path.name.find("-") == -1:
@@ -129,8 +153,7 @@ class MetamodSourcePlugin:
 
     def compiler_set_attrs(self, attr_name: CompilerAttrs, *args: str) -> None:
         """Sets a list of string arguments to a compiler attribute."""
-        value = []
-        value.extend([str(arg) for arg in args])
+        value = [str(arg) for arg in args]
         setattr(self.compiler, attr_name, value)
 
     def compiler_add_attrs(self, attr_name: CompilerAttrs, *args: str) -> None:
@@ -139,17 +162,44 @@ class MetamodSourcePlugin:
         value.extend([str(arg) for arg in args])
         setattr(self.compiler, attr_name, value)
 
-    def compiler_add_debug(self) -> None:
-        """A debug related attributes to the compiler."""
-        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/MTd", "/Od", "/RTC1")
-        self.compiler_add_attrs(CompilerAttrs.DEFINES, "DEBUG", "_DEBUG")
-        self.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, "/NODEFAULTLIB:libcmt")
+    def compiler_display_attrs(self) -> None:
+        """Display the value of all compiler attributes."""
+        for attr_name in CompilerAttrs:
+            print(f"{attr_name}: {getattr(self.compiler, attr_name)}")
 
-    def compiler_add_optimization(self) -> None:
-        """A optimization related attributes to the compiler."""
-        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/Ox", "/Zo")
-        self.compiler_add_attrs(CompilerAttrs.DEFINES, "NDEBUG")
-        self.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, "/OPT:ICF", "/OPT:REF")
+    def set_protoc(self) -> None:
+        protoc_path = self.get_path_from_hl2sdk("devtools", "bin", "protoc.exe")
+        if not protoc_path.exists():
+            raise FileNotFoundError(f'Unable to find protoc.exe at "{protoc_path}".')
+        protoc: Protoc = self.context.DetectProtoc(path=str(protoc_path))
+        self.protoc_job = self.context.tools.Protoc(protoc)
+
+    def protoc_set_sources(self, *args: str) -> None:
+        self.protoc_job.sources = [str(arg) for arg in args]
+
+    def protoc_add_sources(self, *args: str) -> None:
+        self.protoc_job.sources.extend([str(arg) for arg in args])
+
+    def protoc_set_includes(self, *args: str) -> None:
+        self.protoc_job.protoc.includes = [str(arg) for arg in args]
+
+    def protoc_add_includes(self, *args: str) -> None:
+        self.protoc_job.protoc.includes.extend([str(arg) for arg in args])
+
+    def set_binary(self) -> None:
+        self.binary = self.compiler.Library(self.plugin_name)
+
+    def binary_set_sources(self, *args: str) -> None:
+        self.binary.sources = [str(arg) for arg in args]
+
+    def binary_add_sources(self, *args: str) -> None:
+        self.binary.sources.extend([str(arg) for arg in args])
+
+    def binary_set_custom(self, *args: object) -> None:
+        self.binary.custom = list(args)
+
+    def binary_add_custom(self, *args: object) -> None:
+        self.binary.custom.extend(list(args))
 
     def compiler_set_defaults(self) -> None:
         """Clears compiler attributes and sets default values."""
@@ -157,104 +207,56 @@ class MetamodSourcePlugin:
         for attr_name in CompilerAttrs:
             self.compiler_set_attrs(attr_name)
 
-        # Add debug related attributes
-        if self.debug:
-            self.compiler_add_debug()
-        else:
-            self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/MT")
-
-        # Add optimization related attributes
-        if self.optimize:
-            self.compiler_add_optimization()
-
-        # Add standard attributes
-        self.compiler_add_attrs(CompilerAttrs.C_FLAGS, "/W3", "/Zi", "/std:c++17", "/Oy-")
-        self.compiler_add_attrs(CompilerAttrs.CXX_FLAGS, "/TP")
         self.compiler_add_attrs(
             CompilerAttrs.DEFINES,
-            "_CRT_SECURE_NO_DEPRECATE",
-            "_CRT_SECURE_NO_WARNINGS",
-            "_CRT_NONSTDC_NO_DEPRECATE",
-            "WIN32",
-            "_WINDOWS",
+            "COMPILER_MSVC",
+            "COMPILER_MSVC64",
+            "PLATFORM_64BITS",
+            "META_IS_SOURCE2",
+            "SOURCE_ENGINE=25",
         )
+
+        self.compiler_add_attrs(
+            CompilerAttrs.CXX_INCLUDES,
+            self.get_path_from_mss("core"),
+            self.get_path_from_mss("core", "sourcehook"),
+            self.get_path_from_hl2sdk("common"),
+            self.get_path_from_hl2sdk("public"),
+            self.get_path_from_hl2sdk("public", "tier0"),
+            self.get_path_from_hl2sdk("public", "tier1"),
+            self.get_path_from_hl2sdk("thirdparty", "protobuf-3.21.8", "src"),
+        )
+
         self.compiler_add_attrs(
             CompilerAttrs.LINK_FLAGS,
-            "/SUBSYSTEM:WINDOWS",
-            "kernel32.lib",
-            "user32.lib",
-            "gdi32.lib",
-            "winspool.lib",
-            "comdlg32.lib",
-            "advapi32.lib",
-            "shell32.lib",
-            "ole32.lib",
-            "oleaut32.lib",
-            "uuid.lib",
-            "odbc32.lib",
-            "odbccp32.lib",
+            self.get_path_from_hl2sdk("lib", "public", "win64", "2015", "libprotobuf.lib"),
+            self.get_path_from_hl2sdk("lib", "public", "win64", "interfaces.lib"),
+            self.get_path_from_hl2sdk("lib", "public", "win64", "tier0.lib"),
+            self.get_path_from_hl2sdk("lib", "public", "win64", "tier1.lib"),
         )
 
-        # TODO: Add needed sdk includes
+    def protoc_set_defaults(self) -> None:
+        """Initialize the protoc with the needed default values."""
+        self.protoc_set_includes(
+            self.get_path_from_hl2sdk("thirdparty", "protobuf-3.21.8", "src"), self.get_path_from_hl2sdk("common")
+        )
+        self.protoc_set_sources(self.get_path_from_hl2sdk("common", "network_connection.proto"))
 
-    def compiler_display_attrs(self) -> None:
-        """Display the value of all compiler attributes."""
-        for attr_name in CompilerAttrs:
-            print(f"{attr_name}: {getattr(self.compiler, attr_name)}")
+    def binary_set_defaults(self) -> None:
+        """Initialize the binaries with the needed default values."""
+        self.binary_set_sources(
+            self.get_path_from_root("src", "sample_mm.cpp"),
+            self.get_path_from_hl2sdk("tier1", "convar.cpp"),
+            self.get_path_from_hl2sdk("public", "tier0", "memoverride.cpp"),
+        )
+        self.binary_set_custom(self.protoc_job)
+
+    def add_binaries(self) -> None:
+        """Add a list of binaries to the current context.
+
+        TODO: Support multiple binaries
+        """
+        cpp_node = self.context.Add(self.binary)
 
 
 plugin = MetamodSourcePlugin(builder)
-
-# ROOT_DIR_PATH = pathlib.Path(plugin.context.sourcePath).resolve()
-# METAMOD_SOURCE_PATH = ROOT_DIR_PATH.joinpath("metamod-source").resolve()
-# HL2SDK_CS2_PATH = ROOT_DIR_PATH.joinpath("hl2sdk-cs2").resolve()
-
-# # Needed by metamod
-# plugin.compiler_add_attrs(
-#     CompilerAttrs.CXX_INCLUDES,
-#     METAMOD_SOURCE_PATH.joinpath("core").resolve(),
-#     METAMOD_SOURCE_PATH.joinpath("core", "sourcehook").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("common").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("public").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("public", "tier0").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("public", "tier1").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("thirdparty", "protobuf-3.21.8", "src").resolve(),
-# )
-
-# plugin.compiler_add_attrs(
-#     CompilerAttrs.DEFINES,
-#     "COMPILER_MSVC",
-#     "COMPILER_MSVC64",
-#     "META_IS_SOURCE2",
-#     "PLATFORM_64BITS",
-#     "SOURCE_ENGINE=25"
-# )
-
-# plugin.compiler_add_attrs(
-#     CompilerAttrs.LINK_FLAGS,
-#     HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "2015", "libprotobuf.lib").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "interfaces.lib").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "tier0.lib").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "tier1.lib").resolve(),
-# )
-
-# # Protocs
-# protoc_path = HL2SDK_CS2_PATH.joinpath("devtools", "bin", "protoc.exe")
-# protoc: Protoc = plugin.context.DetectProtoc(path=str(protoc_path))
-# protoc.includes += [
-#     HL2SDK_CS2_PATH.joinpath("thirdparty", "protobuf-3.21.8", "src").resolve(),
-#     HL2SDK_CS2_PATH.joinpath("common").resolve(),
-# ]
-# protoc_job = plugin.context.tools.Protoc(
-#     protoc=protoc, sources=[str(HL2SDK_CS2_PATH.joinpath("common", "network_connection.proto"))]
-# )
-
-# # Create library
-# binary = plugin.compiler.Library(plugin.name)
-# binary.sources += [
-#     str(pathlib.Path(plugin.context.sourcePath, "src", "sample_mm.cpp").resolve()),
-#     str(HL2SDK_CS2_PATH.joinpath("tier1", "convar.cpp").resolve()),
-#     str(HL2SDK_CS2_PATH.joinpath("public", "tier0", "memoverride.cpp").resolve()),
-# ]
-# binary.custom += [protoc_job]
-# cpp_node = plugin.context.Add(binary)
