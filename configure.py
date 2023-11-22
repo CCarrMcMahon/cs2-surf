@@ -3,32 +3,39 @@ from ambuild2 import run
 
 
 API_VERSION = "2.2.4"
+
+PLUGIN_NAME = "cs2-surf"
+PLUGIN_ALIAS = ""
+MMS_PATH = "metamod-source"
+HL2SDK_PATH = "hl2sdk-cs2"
+
+
 if not run.HasAPI(API_VERSION):
     raise ImportError(f"This plugin requires AMBuild version {API_VERSION} or similar to be installed.")
 
 builder = run.BuildParser(sourcePath=sys.path[0], api=API_VERSION)
 builder.options.add_argument(
-    "--plugin_name",
+    "--name",
     type=str,
-    default="cs2-surf",
+    default=PLUGIN_NAME,
     help="The overall name of the plugin.",
 )
 builder.options.add_argument(
-    "--plugin_alias",
+    "--alias",
     type=str,
-    default="",
-    help="An alias for the name of the plugin to appear in the metaplugins.ini file.",
+    default=PLUGIN_ALIAS,
+    help="An alias for the name of the plugin.",
 )
 builder.options.add_argument(
-    "--debug",
-    action="store_true",
-    default=False,
-    help="Include to enable debugging symbols.",
+    "--mms_path",
+    type=str,
+    default=MMS_PATH,
+    help="The path to the Metamod:Source directory.",
 )
 builder.options.add_argument(
-    "--optimize",
-    action="store_true",
-    default=False,
-    help="Include to enable compiler optimizations.",
+    "--hl2sdk_path",
+    type=str,
+    default=HL2SDK_PATH,
+    help="The path to the HL2SDK directory.",
 )
 builder.Configure()
