@@ -3,6 +3,7 @@ import pathlib
 from pathlib import Path
 from ambuild2.frontend.v2_2.context import BuildContext
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
+from ambuild2.frontend.v2_2.tools.protoc import Protoc
 
 
 class CompilerAttrs(StrEnum):
@@ -35,7 +36,7 @@ class MetamodSourcePlugin:
         self.context = context
         self.__parse_context_options()
         self.set_compiler()
-        self.compiler_set_defaults()
+        # self.compiler_set_defaults()
 
     def __parse_context_options(self) -> None:
         """A private helper method to parse custom plugin arguments."""
@@ -151,6 +152,8 @@ class MetamodSourcePlugin:
             "odbccp32.lib",
         )
 
+        # TODO: Add needed sdk includes
+
     def compiler_display_attrs(self) -> None:
         """Display the value of all compiler attributes."""
         for attr_name in CompilerAttrs:
@@ -158,3 +161,52 @@ class MetamodSourcePlugin:
 
 
 plugin = MetamodSourcePlugin(builder)
+
+ROOT_DIR_PATH = pathlib.Path(plugin.context.sourcePath).resolve()
+METAMOD_SOURCE_PATH = ROOT_DIR_PATH.joinpath("metamod-source").resolve()
+HL2SDK_CS2_PATH = ROOT_DIR_PATH.joinpath("hl2sdk-cs2").resolve()
+
+# Needed by metamod
+plugin.compiler_add_attrs(
+    CompilerAttrs.CXX_INCLUDES,
+    METAMOD_SOURCE_PATH.joinpath("core").resolve(),
+    METAMOD_SOURCE_PATH.joinpath("core", "sourcehook").resolve(),
+    HL2SDK_CS2_PATH.joinpath("common").resolve(),
+    HL2SDK_CS2_PATH.joinpath("public").resolve(),
+    HL2SDK_CS2_PATH.joinpath("public", "tier0").resolve(),
+    HL2SDK_CS2_PATH.joinpath("public", "tier1").resolve(),
+    HL2SDK_CS2_PATH.joinpath("thirdparty", "protobuf-3.21.8", "src").resolve(),
+)
+
+plugin.compiler_add_attrs(
+    CompilerAttrs.DEFINES, "COMPILER_MSVC", "COMPILER_MSVC64", "META_IS_SOURCE2", "PLATFORM_64BITS", "SOURCE_ENGINE=25"
+)
+
+plugin.compiler_add_attrs(
+    CompilerAttrs.LINK_FLAGS,
+    HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "2015", "libprotobuf.lib").resolve(),
+    HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "interfaces.lib").resolve(),
+    HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "tier0.lib").resolve(),
+    HL2SDK_CS2_PATH.joinpath("lib", "public", "win64", "tier1.lib").resolve(),
+)
+
+# Protocs
+protoc_path = HL2SDK_CS2_PATH.joinpath("devtools", "bin", "protoc.exe")
+protoc: Protoc = plugin.context.DetectProtoc(path=str(protoc_path))
+protoc.includes += [
+    HL2SDK_CS2_PATH.joinpath("thirdparty", "protobuf-3.21.8", "src").resolve(),
+    HL2SDK_CS2_PATH.joinpath("common").resolve(),
+]
+protoc_job = plugin.context.tools.Protoc(
+    protoc=protoc, sources=[str(HL2SDK_CS2_PATH.joinpath("common", "network_connection.proto"))]
+)
+
+# Create library
+binary = plugin.compiler.Library(plugin.name)
+binary.sources += [
+    str(pathlib.Path(plugin.context.sourcePath, "src", "sample_mm.cpp").resolve()),
+    str(HL2SDK_CS2_PATH.joinpath("tier1", "convar.cpp").resolve()),
+    str(HL2SDK_CS2_PATH.joinpath("public", "tier0", "memoverride.cpp").resolve()),
+]
+binary.custom += [protoc_job]
+cpp_node = plugin.context.Add(binary)
