@@ -7,6 +7,10 @@ from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
 from ambuild2.frontend.v2_2.tools.protoc import Protoc, ProtocJob
 
 
+# TODO: Support multiple binaries by allow list to be created and context based compiler
+# TODO: Add packaging functionality
+
+
 class CompilerAttrs(StrEnum):
     INCLUDES = "includes"
     CXX_INCLUDES = "cxxincludes"
@@ -187,10 +191,7 @@ class MetamodSourcePlugin:
         self.protoc_job.protoc.includes.extend([str(arg) for arg in args])
 
     def set_binary(self) -> None:
-        """Create a binary from the compiler and the plugin name.
-        
-        TODO: Allow creating multiple types of binaries and support compiler context
-        """
+        """Create a binary from the compiler and the plugin name."""
         self.binary = self.compiler.Library(self.plugin_name)
         self.compiler = self.binary.compiler
 
@@ -257,10 +258,7 @@ class MetamodSourcePlugin:
         self.binary_set_custom(self.protoc_job)
 
     def add_binaries(self) -> None:
-        """Add a list of binaries to the current context.
-
-        TODO: Support multiple binaries
-        """
+        """Add a list of binaries to the current context."""
         cpp_node = self.context.Add(self.binary)
 
 
