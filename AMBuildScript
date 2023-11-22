@@ -9,6 +9,8 @@ from ambuild2.frontend.v2_2.tools.protoc import Protoc, ProtocJob
 
 # TODO: Support multiple binaries by allow list to be created and context based compiler
 # TODO: Add packaging functionality
+# TODO: Dynamically parse from manifest files
+# TODO: Add AMBuilder and PackageScript
 
 
 class CompilerAttrs(StrEnum):
