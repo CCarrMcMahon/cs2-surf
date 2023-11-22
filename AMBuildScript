@@ -187,7 +187,12 @@ class MetamodSourcePlugin:
         self.protoc_job.protoc.includes.extend([str(arg) for arg in args])
 
     def set_binary(self) -> None:
+        """Create a binary from the compiler and the plugin name.
+        
+        TODO: Allow creating multiple types of binaries and support compiler context
+        """
         self.binary = self.compiler.Library(self.plugin_name)
+        self.compiler = self.binary.compiler
 
     def binary_set_sources(self, *args: str) -> None:
         self.binary.sources = [str(arg) for arg in args]
