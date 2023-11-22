@@ -26,11 +26,12 @@ class MetamodSourcePlugin:
     """A class with variables and functions related to the plugin."""
 
     context: BuildContext
-    name: str
-    alias: str
+    plugin_name: str
+    plugin_alias: str
     root_path: Path
     mms_path: Path
     hl2sdk_path: Path
+    game_name: str
     compiler: CliCompiler
     protoc_job: ProtocJob
 
@@ -43,17 +44,19 @@ class MetamodSourcePlugin:
 
     def __parse_context_options(self) -> None:
         """A private helper method to parse custom plugin arguments."""
-        name: str = self.context.options.name
-        alias: str = self.context.options.alias
+        plugin_name: str = self.context.options.plugin_name
+        plugin_alias: str = self.context.options.plugin_alias
         mms_path_str: str = self.context.options.mms_path
         hl2sdk_path_str: str = self.context.options.hl2sdk_path
+        game_name: str = self.context.options.game_name
 
-        name = name.strip()
-        alias = alias.strip()
+        plugin_name = plugin_name.strip()
+        plugin_alias = plugin_alias.strip()
         mms_path_str = mms_path_str.strip()
         hl2sdk_path_str = hl2sdk_path_str.strip()
+        game_name = game_name.strip()
 
-        if name == "":
+        if plugin_name == "":
             raise ValueError("The name of the plugin can't be empty.")
 
         if mms_path_str == "":
@@ -71,10 +74,30 @@ class MetamodSourcePlugin:
         if not hl2sdk_path.is_absolute():
             hl2sdk_path = self.root_path.joinpath(hl2sdk_path).resolve()
 
-        self.name = name
-        self.alias = alias
+        if game_name == "":
+            if hl2sdk_path.name.find("-") == -1:
+                raise ValueError("The name of the game can't be empty and not in the HL2SDK path.")
+            game_name = hl2sdk_path.name.split("-")[-1].strip()
+
+        if not mms_path.exists():
+            raise FileNotFoundError(f'The Metamod:Source path "{mms_path}" doesn\'t exist.')
+
+        if not mms_path.is_dir():
+            raise NotADirectoryError(f'The Metamod:Source path "{mms_path}" must be a directory.')
+
+        if not hl2sdk_path.exists():
+            hl2sdk_path = pathlib.Path(f"{hl2sdk_path}-{game_name}").resolve()
+            if not hl2sdk_path.exists():
+                raise FileNotFoundError(f'The HL2SDK path "{hl2sdk_path}" doesn\'t exist.')
+
+            if not hl2sdk_path.is_dir():
+                raise NotADirectoryError(f'The HL2SDK path "{hl2sdk_path}" must be a directory.')
+
+        self.plugin_name = plugin_name
+        self.plugin_alias = plugin_alias
         self.mms_path = mms_path
         self.hl2sdk_path = hl2sdk_path
+        self.game_name = game_name
 
     def set_compiler(self, platform="", arch="", abi="") -> None:
         """A method to set the compiler that will be used for the plugin.
