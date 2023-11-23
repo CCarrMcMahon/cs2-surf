@@ -1,16 +1,23 @@
 from enum import StrEnum
-import pathlib
 from pathlib import Path
 from ambuild2.frontend.v2_2.context import BuildContext
 from ambuild2.frontend.v2_2.cpp.builders import BinaryBuilder
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
-from ambuild2.frontend.v2_2.tools.protoc import Protoc, ProtocJob
+from ambuild2.frontend.v2_2.cpp.deptypes import CppNodes
+from ambuild2.frontend.v2_2.tools.protoc import Protoc
 
 
 # TODO: Support multiple binaries by allow list to be created and context based compiler
 # TODO: Add packaging functionality
 # TODO: Dynamically parse from manifest files
 # TODO: Add AMBuilder and PackageScript
+# TODO: Add method to populate base am builder with default values (most likely based on manifest)
+
+
+class BinaryType(StrEnum):
+    PROGRAM = "Program"
+    LIBRARY = "Library"
+    STATIC_LIBRARY = "StaticLibrary"
 
 
 class CompilerAttrs(StrEnum):
@@ -29,108 +36,61 @@ class CompilerAttrs(StrEnum):
     LINK_DEPS = "linkdeps"
 
 
-class MetamodSourcePlugin:
-    """A class with variables and functions related to the plugin."""
-
+class AMBuilder:
     context: BuildContext
-    plugin_name: str
-    plugin_alias: str
-    root_path: Path
-    mms_path: Path
-    hl2sdk_path: Path
-    game_name: str
     compiler: CliCompiler
-    protoc_job: ProtocJob
+    protoc: Protoc
     binary: BinaryBuilder
 
     def __init__(self, context: BuildContext) -> None:
         self.context = context
-        self.root_path = pathlib.Path(context.sourcePath).resolve()
-        self.__parse_context_options()
-        self.set_compiler()
-        self.set_protoc()
-        self.set_binary()
-        self.compiler_set_defaults()
-        self.protoc_set_defaults()
-        self.binary_set_defaults()
-        self.add_binaries()
-        self.compiler_display_attrs()
-        print(self.protoc_job.sources)
-        print(self.protoc_job.protoc.includes)
-        print(self.binary.sources)
-        print(self.binary.custom)
 
-    def get_path(self, *args: str) -> Path:
-        return pathlib.Path(*args).resolve()
+    def clone(self, new_context: BuildContext) -> "AMBuilder":
+        """Return a version of this object with the same compiler and protoc objects but a
+        different context and undefined binary.
+        """
+        am_builder = AMBuilder(new_context)
+        am_builder.compiler = self.compiler.clone()
+        am_builder.protoc = self.protoc.clone()
+        return am_builder
 
-    def get_path_from_root(self, *args: str) -> Path:
-        return self.get_path(self.root_path, *args)
+    def parse_path(self, path: Path | str, verify_exists: bool = False) -> Path:
+        """A helper method that makes sure relative paths are based on the current context.
 
-    def get_path_from_mss(self, *args: str) -> Path:
-        return self.get_path(self.mms_path, *args)
+        If verify_exists is True, then an exception will be raised if the path provided
+        does not exist.
+        """
+        path = Path(path)
+        if not path.is_absolute():
+            path = Path(self.context.currentSourcePath, path)
+        path = path.resolve()
+        if verify_exists and not path.exists():
+            raise FileNotFoundError(f'No file found at "{path}".')
+        return path
 
-    def get_path_from_hl2sdk(self, *args: str) -> Path:
-        return self.get_path(self.hl2sdk_path, *args)
+    def parse_paths(self, paths: list[Path | str], verify_exists: bool = False) -> list[Path]:
+        """A helper method that returns a list of parsed paths.
 
-    def __parse_context_options(self) -> None:
-        """A private helper method to parse custom plugin arguments."""
-        plugin_name: str = self.context.options.plugin_name
-        plugin_alias: str = self.context.options.plugin_alias
-        mms_path_str: str = self.context.options.mms_path
-        hl2sdk_path_str: str = self.context.options.hl2sdk_path
-        game_name: str = self.context.options.game_name
+        If verify_exists is True, then an exception will be raised if the path provided
+        does not exist.
+        """
+        path_list = []
+        for path in paths:
+            path = self.parse_path(path, verify_exists)
+            path_list.append(path)
+        return path_list
 
-        plugin_name = plugin_name.strip()
-        plugin_alias = plugin_alias.strip()
-        mms_path_str = mms_path_str.strip()
-        hl2sdk_path_str = hl2sdk_path_str.strip()
-        game_name = game_name.strip()
+    def parse_paths_str(self, paths: list[Path | str], verify_exists: bool = False) -> list[str]:
+        """A helper method that returns a list of string type parsed paths.
 
-        if plugin_name == "":
-            raise ValueError("The name of the plugin can't be empty.")
-
-        if mms_path_str == "":
-            raise ValueError("The path to the Metamod:Source directory can't be empty.")
-
-        if hl2sdk_path_str == "":
-            raise ValueError("The path to the HL2SDK directory can't be empty.")
-
-        mms_path = pathlib.Path(mms_path_str)
-        hl2sdk_path = pathlib.Path(hl2sdk_path_str)
-
-        if not mms_path.is_absolute():
-            mms_path = self.get_path_from_root(mms_path)
-
-        if not hl2sdk_path.is_absolute():
-            hl2sdk_path = self.get_path_from_root(hl2sdk_path)
-
-        if game_name == "":
-            if hl2sdk_path.name.find("-") == -1:
-                raise ValueError("The name of the game can't be empty and not in the HL2SDK path.")
-            game_name = hl2sdk_path.name.split("-")[-1].strip()
-
-        if not mms_path.exists():
-            raise FileNotFoundError(f'The Metamod:Source path "{mms_path}" doesn\'t exist.')
-
-        if not mms_path.is_dir():
-            raise NotADirectoryError(f'The Metamod:Source path "{mms_path}" must be a directory.')
-
-        if not hl2sdk_path.exists():
-            hl2sdk_path = pathlib.Path(f"{hl2sdk_path}-{game_name}").resolve()
-            if not hl2sdk_path.exists():
-                raise FileNotFoundError(f'The HL2SDK path "{hl2sdk_path}" doesn\'t exist.')
-
-            if not hl2sdk_path.is_dir():
-                raise NotADirectoryError(f'The HL2SDK path "{hl2sdk_path}" must be a directory.')
-
-        self.plugin_name = plugin_name
-        self.plugin_alias = plugin_alias
-        self.mms_path = mms_path
-        self.hl2sdk_path = hl2sdk_path
-        self.game_name = game_name
+        If verify_exists is True, then an exception will be raised if the path provided
+        does not exist.
+        """
+        path_list = self.parse_paths(paths, verify_exists)
+        return [str(path) for path in path_list]
 
     def set_compiler(self, platform="", arch="", abi="") -> None:
-        """A method to set the compiler that will be used for the plugin.
+        """Set the compiler for this builder.
 
         Currently, only Windows x86_64 MSVC is supported.
         """
@@ -157,6 +117,37 @@ class MetamodSourcePlugin:
 
         self.compiler = compiler
 
+    def set_protoc(self, protoc_path: Path | str = None) -> None:
+        """Set the protoc for this builder."""
+        if protoc_path is None or protoc_path == "":
+            self.protoc = self.context.DetectProtoc()
+            return
+
+        protoc_path = self.parse_path(protoc_path)
+        if not protoc_path.exists():
+            raise FileNotFoundError(f'No protoc executable found at "{protoc_path}".')
+
+        if not protoc_path.is_file():
+            raise IsADirectoryError("The protoc path needs to be a file, not a directory.")
+
+        self.protoc = self.context.DetectProtoc(path=str(protoc_path))
+
+    def set_binary(self, name: str, binary_type: BinaryType) -> None:
+        """Set the resulting binary type."""
+        if name == "":
+            raise ValueError("The binary name can't be empty.")
+
+        if binary_type == BinaryType.PROGRAM:
+            self.binary = self.compiler.Program(name)
+        elif binary_type == BinaryType.LIBRARY:
+            self.binary = self.compiler.Library(name)
+        elif binary_type == BinaryType.STATIC_LIBRARY:
+            self.binary = self.compiler.StaticLibrary(name)
+        else:
+            raise ValueError("The binary type must be either a Program, Library, or StaticLibrary.")
+
+        self.compiler = self.binary.compiler
+
     def compiler_set_attrs(self, attr_name: CompilerAttrs, *args: str) -> None:
         """Sets a list of string arguments to a compiler attribute."""
         value = [str(arg) for arg in args]
@@ -173,49 +164,114 @@ class MetamodSourcePlugin:
         for attr_name in CompilerAttrs:
             print(f"{attr_name}: {getattr(self.compiler, attr_name)}")
 
-    def set_protoc(self) -> None:
-        protoc_path = self.get_path_from_hl2sdk("devtools", "bin", "protoc.exe")
-        if not protoc_path.exists():
-            raise FileNotFoundError(f'Unable to find protoc.exe at "{protoc_path}".')
-        protoc: Protoc = self.context.DetectProtoc(path=str(protoc_path))
-        self.protoc_job = self.context.tools.Protoc(protoc)
+    def add_binary_sources(self, source_paths: list[Path | str]) -> None:
+        """Add source files to the binary."""
+        sources = self.parse_paths_str(source_paths, verify_exists=True)
+        self.binary.sources.extend(sources)
 
-    def protoc_set_sources(self, *args: str) -> None:
-        self.protoc_job.sources = [str(arg) for arg in args]
+    def add_protoc_includes(self, include_paths: list[Path | str]) -> None:
+        """Add include files to the protoc."""
+        includes = self.parse_paths_str(include_paths, verify_exists=True)
+        self.protoc.includes.extend(includes)
 
-    def protoc_add_sources(self, *args: str) -> None:
-        self.protoc_job.sources.extend([str(arg) for arg in args])
+    def add_protoc_sources(self, source_paths: list[Path | str]) -> None:
+        """Add source files to the protoc."""
+        sources = self.parse_paths_str(source_paths, verify_exists=True)
+        protoc_job = self.context.tools.Protoc(protoc=self.protoc, sources=sources)
+        self.binary.custom.append(protoc_job)
 
-    def protoc_set_includes(self, *args: str) -> None:
-        self.protoc_job.protoc.includes = [str(arg) for arg in args]
 
-    def protoc_add_includes(self, *args: str) -> None:
-        self.protoc_job.protoc.includes.extend([str(arg) for arg in args])
+class MetamodSourcePlugin:
+    """A class with variables and functions related to the plugin."""
 
-    def set_binary(self) -> None:
-        """Create a binary from the compiler and the plugin name."""
-        self.binary = self.compiler.Library(self.plugin_name)
-        self.compiler = self.binary.compiler
+    am_builder: AMBuilder
+    plugin_name: str
+    plugin_alias: str
+    mms_path: Path
+    hl2sdk_path: Path
+    game_name: str
+    nodes: list[CppNodes]
 
-    def binary_set_sources(self, *args: str) -> None:
-        self.binary.sources = [str(arg) for arg in args]
+    def __init__(self, context: BuildContext) -> None:
+        self.am_builder = self.create_am_builder(context)
+        self.__parse_context_options()
+        self.nodes = []
+        self.am_builder.set_compiler()
+        self.am_builder.set_protoc(f"{self.hl2sdk_path}\\devtools\\bin\\protoc.exe")
+        self.am_builder.set_binary(self.plugin_name, BinaryType.LIBRARY)
+        self.set_am_builder_defaults(self.am_builder)
+        self.add_am_builder(self.am_builder)
 
-    def binary_add_sources(self, *args: str) -> None:
-        self.binary.sources.extend([str(arg) for arg in args])
+    def create_am_builder(self, context: BuildContext) -> AMBuilder:
+        """Create a new AMBuilder object without any values."""
+        return AMBuilder(context)
 
-    def binary_set_custom(self, *args: object) -> None:
-        self.binary.custom = list(args)
+    def clone_am_builder(self, context: BuildContext) -> AMBuilder:
+        """Clone the AMBuilder object saved to this class."""
+        return self.am_builder.clone(context)
 
-    def binary_add_custom(self, *args: object) -> None:
-        self.binary.custom.extend(list(args))
+    def add_am_builder(self, am_builder: AMBuilder) -> None:
+        """Add the binary from an am_builder to the build context."""
+        cpp_node = am_builder.context.Add(am_builder.binary)
+        self.nodes.append(cpp_node)
 
-    def compiler_set_defaults(self) -> None:
-        """Clears compiler attributes and sets default values."""
-        # Clear attributes
+    def __parse_context_options(self) -> None:
+        """A private helper method to parse custom plugin arguments."""
+        plugin_name: str = self.am_builder.context.options.plugin_name
+        plugin_alias: str = self.am_builder.context.options.plugin_alias
+        mms_path_str: str = self.am_builder.context.options.mms_path
+        hl2sdk_path_str: str = self.am_builder.context.options.hl2sdk_path
+        game_name: str = self.am_builder.context.options.game_name
+
+        plugin_name = plugin_name.strip()
+        plugin_alias = plugin_alias.strip()
+        mms_path_str = mms_path_str.strip()
+        hl2sdk_path_str = hl2sdk_path_str.strip()
+        game_name = game_name.strip()
+
+        if plugin_name == "":
+            raise ValueError("The name of the plugin can't be empty.")
+
+        if mms_path_str == "":
+            raise ValueError("The path to the Metamod:Source directory can't be empty.")
+
+        if hl2sdk_path_str == "":
+            raise ValueError("The path to the HL2SDK directory can't be empty.")
+
+        mms_path = self.am_builder.parse_path(mms_path_str)
+        hl2sdk_path = self.am_builder.parse_path(hl2sdk_path_str)
+
+        if game_name == "":
+            if hl2sdk_path.name.find("-") == -1:
+                raise ValueError("The name of the game can't be empty and not in the HL2SDK path.")
+            game_name = hl2sdk_path.name.split("-")[-1].strip()
+
+        if not mms_path.exists():
+            raise FileNotFoundError(f'The Metamod:Source path "{mms_path}" doesn\'t exist.')
+
+        if not mms_path.is_dir():
+            raise NotADirectoryError(f'The Metamod:Source path "{mms_path}" must be a directory.')
+
+        if not hl2sdk_path.exists():
+            hl2sdk_path = Path(f"{hl2sdk_path}-{game_name}").resolve()
+            if not hl2sdk_path.exists():
+                raise FileNotFoundError(f'The HL2SDK path "{hl2sdk_path}" doesn\'t exist.')
+
+            if not hl2sdk_path.is_dir():
+                raise NotADirectoryError(f'The HL2SDK path "{hl2sdk_path}" must be a directory.')
+
+        self.plugin_name = plugin_name
+        self.plugin_alias = plugin_alias
+        self.mms_path = mms_path
+        self.hl2sdk_path = hl2sdk_path
+        self.game_name = game_name
+
+    def set_am_builder_defaults(self, new_am_builder: AMBuilder) -> None:
+        # Compiler #
         for attr_name in CompilerAttrs:
-            self.compiler_set_attrs(attr_name)
+            new_am_builder.compiler_set_attrs(attr_name)
 
-        self.compiler_add_attrs(
+        new_am_builder.compiler_add_attrs(
             CompilerAttrs.DEFINES,
             "COMPILER_MSVC",
             "COMPILER_MSVC64",
@@ -224,44 +280,41 @@ class MetamodSourcePlugin:
             "SOURCE_ENGINE=25",
         )
 
-        self.compiler_add_attrs(
-            CompilerAttrs.CXX_INCLUDES,
-            self.get_path_from_mss("core"),
-            self.get_path_from_mss("core", "sourcehook"),
-            self.get_path_from_hl2sdk("common"),
-            self.get_path_from_hl2sdk("public"),
-            self.get_path_from_hl2sdk("public", "tier0"),
-            self.get_path_from_hl2sdk("public", "tier1"),
-            self.get_path_from_hl2sdk("thirdparty", "protobuf-3.21.8", "src"),
-        )
+        cxx_include_paths = [
+            f"{self.mms_path}\\core",
+            f"{self.mms_path}\\core\\sourcehook",
+            f"{self.hl2sdk_path}\\common",
+            f"{self.hl2sdk_path}\\public",
+            f"{self.hl2sdk_path}\\public\\tier0",
+            f"{self.hl2sdk_path}\\public\\tier1",
+            f"{self.hl2sdk_path}\\thirdparty\\protobuf-3.21.8\\src",
+        ]
+        cxx_includes = self.am_builder.parse_paths_str(cxx_include_paths, verify_exists=True)
+        new_am_builder.compiler_add_attrs(CompilerAttrs.CXX_INCLUDES, *cxx_includes)
 
-        self.compiler_add_attrs(
-            CompilerAttrs.LINK_FLAGS,
-            self.get_path_from_hl2sdk("lib", "public", "win64", "2015", "libprotobuf.lib"),
-            self.get_path_from_hl2sdk("lib", "public", "win64", "interfaces.lib"),
-            self.get_path_from_hl2sdk("lib", "public", "win64", "tier0.lib"),
-            self.get_path_from_hl2sdk("lib", "public", "win64", "tier1.lib"),
-        )
+        link_flag_paths = [
+            f"{self.hl2sdk_path}\\lib\\public\\win64\\2015\\libprotobuf.lib",
+            f"{self.hl2sdk_path}\\lib\\public\\win64\\interfaces.lib",
+            f"{self.hl2sdk_path}\\lib\\public\\win64\\tier0.lib",
+            f"{self.hl2sdk_path}\\lib\\public\\win64\\tier1.lib",
+        ]
+        link_flags = self.am_builder.parse_paths_str(link_flag_paths, verify_exists=True)
+        new_am_builder.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, *link_flags)
 
-    def protoc_set_defaults(self) -> None:
-        """Initialize the protoc with the needed default values."""
-        self.protoc_set_includes(
-            self.get_path_from_hl2sdk("thirdparty", "protobuf-3.21.8", "src"), self.get_path_from_hl2sdk("common")
-        )
-        self.protoc_set_sources(self.get_path_from_hl2sdk("common", "network_connection.proto"))
+        # Protoc #
+        protoc_include_paths = [f"{self.hl2sdk_path}\\thirdparty\\protobuf-3.21.8\\src", f"{self.hl2sdk_path}\\common"]
+        new_am_builder.add_protoc_includes(protoc_include_paths)
 
-    def binary_set_defaults(self) -> None:
-        """Initialize the binaries with the needed default values."""
-        self.binary_set_sources(
-            self.get_path_from_root("src", "sample_mm.cpp"),
-            self.get_path_from_hl2sdk("tier1", "convar.cpp"),
-            self.get_path_from_hl2sdk("public", "tier0", "memoverride.cpp"),
-        )
-        self.binary_set_custom(self.protoc_job)
+        protoc_source_paths = [f"{self.hl2sdk_path}\\common\\network_connection.proto"]
+        new_am_builder.add_protoc_sources(protoc_source_paths)
 
-    def add_binaries(self) -> None:
-        """Add a list of binaries to the current context."""
-        cpp_node = self.context.Add(self.binary)
+        # Binary #
+        binary_source_paths = [
+            "src\\sample_mm.cpp",  # TODO: Move to am_builder.py
+            f"{self.hl2sdk_path}\\tier1\\convar.cpp",
+            f"{self.hl2sdk_path}\\public\\tier0\\memoverride.cpp",
+        ]
+        new_am_builder.add_binary_sources(binary_source_paths)
 
 
 plugin = MetamodSourcePlugin(builder)
