@@ -1,5 +1,6 @@
 from enum import StrEnum
 from pathlib import Path
+import json
 from ambuild2.frontend.v2_2.context import BuildContext
 from ambuild2.frontend.v2_2.cpp.builders import BinaryBuilder
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
@@ -190,24 +191,23 @@ class MetamodSourcePlugin:
     mms_path: Path
     hl2sdk_path: Path
     game_name: str
+    manifiest_dict: dict
     nodes: list[CppNodes]
 
     def __init__(self, context: BuildContext) -> None:
         self.am_builder = self.create_am_builder(context)
         self.__parse_context_options()
         self.nodes = []
-        self.am_builder.set_compiler()
-        self.am_builder.set_protoc(f"{self.hl2sdk_path}\\devtools\\bin\\protoc.exe")
-        self.am_builder.set_binary(self.plugin_name, BinaryType.LIBRARY)
+        self.configure_am_builder(self.am_builder, self.plugin_name, BinaryType.LIBRARY)
         self.set_am_builder_defaults(self.am_builder)
         self.add_am_builder(self.am_builder)
 
     def create_am_builder(self, context: BuildContext) -> AMBuilder:
-        """Create a new AMBuilder object without any values."""
+        """Returns a new AMBuilder object without any values."""
         return AMBuilder(context)
 
     def clone_am_builder(self, context: BuildContext) -> AMBuilder:
-        """Clone the AMBuilder object saved to this class."""
+        """Returns a clone of the AMBuilder object saved to this class."""
         return self.am_builder.clone(context)
 
     def add_am_builder(self, am_builder: AMBuilder) -> None:
@@ -260,61 +260,114 @@ class MetamodSourcePlugin:
             if not hl2sdk_path.is_dir():
                 raise NotADirectoryError(f'The HL2SDK path "{hl2sdk_path}" must be a directory.')
 
+        manfiest_file_path = mms_path.joinpath(f"hl2sdk-manifests\\manifests\\{game_name}.json").resolve()
+
+        if not manfiest_file_path.exists():
+            raise FileNotFoundError(f'The Manifest File path "{manfiest_file_path}" doesn\'t exist.')
+
+        if not manfiest_file_path.is_file():
+            raise IsADirectoryError(f'The Manifiest File path "{manfiest_file_path}" must be a file.')
+
+        manifiest_dict = {}
+        with open(manfiest_file_path, encoding="utf-8") as f:
+            manifiest_dict = json.load(f)
+
         self.plugin_name = plugin_name
         self.plugin_alias = plugin_alias
         self.mms_path = mms_path
         self.hl2sdk_path = hl2sdk_path
         self.game_name = game_name
+        self.manifiest_dict = manifiest_dict
 
-    def set_am_builder_defaults(self, new_am_builder: AMBuilder) -> None:
+    def configure_am_builder(
+        self,
+        am_builder: AMBuilder,
+        binary_name: str,
+        binary_type: BinaryType,
+        platform: str = "",
+        arch: str = "",
+        abi: str = "",
+        protoc_path: str = "",
+    ) -> None:
+        """Configures the compiler, protoc, and binary variables of an AMBuilder object if valid according to the
+        manifest file.
+        """
+        # Compiler #
+        am_builder.set_compiler(platform, arch, abi)
+        target_platform = am_builder.compiler.target.platform
+        supported_platforms: dict[str, list] = self.manifiest_dict.get("platforms", {})
+        if target_platform not in supported_platforms:
+            raise SystemExit(f'The target platform "{target_platform}" isn\'t supported.')
+
+        target_arch = am_builder.compiler.target.arch
+        supported_archs = supported_platforms.get(target_platform, [])
+        if target_arch not in supported_archs:
+            raise SystemExit(f'The target arch "{target_arch}" isn\'t supprted.')
+
+        # Protoc #
+        if protoc_path == "":
+            platform_reqs: dict = self.manifiest_dict.get(target_platform, {})
+            if "protoc_path" in platform_reqs:
+                protoc_path = platform_reqs.get("protoc_path", "")
+                protoc_path = f"{self.hl2sdk_path}\\{protoc_path}"
+
+        if protoc_path != "":
+            am_builder.set_protoc(protoc_path)
+
+        # Binary #
+        am_builder.set_binary(binary_name, binary_type)
+
+    def set_am_builder_defaults(self, am_builder: AMBuilder) -> None:
+        """Populate an AMBuilder with values needed according to the manfiest file."""
+        # TODO: Adjust defines, paths, and more based on platform and arch
+        target_platform = am_builder.compiler.target.platform
+        target_arch = am_builder.compiler.target.arch
+
+        # Manifest Values #
+        code: int = self.manifiest_dict.get("code", -1)
+        is_source_2: bool = self.manifiest_dict.get("source2", False)
+        manifest_include_paths = self.manifiest_dict.get("include_paths", [])
+        platform_reqs: dict = self.manifiest_dict.get(target_platform, {})
+        arch_reqs: dict = platform_reqs.get(target_arch, {})
+        manifest_libs_paths = arch_reqs.get("libs", [])
+
         # Compiler #
         for attr_name in CompilerAttrs:
-            new_am_builder.compiler_set_attrs(attr_name)
+            am_builder.compiler_set_attrs(attr_name)
 
-        new_am_builder.compiler_add_attrs(
-            CompilerAttrs.DEFINES,
-            "COMPILER_MSVC",
-            "COMPILER_MSVC64",
-            "PLATFORM_64BITS",
-            "META_IS_SOURCE2",
-            "SOURCE_ENGINE=25",
-        )
+        defines = ["COMPILER_MSVC", "COMPILER_MSVC64", "PLATFORM_64BITS", f"SOURCE_ENGINE={code}"]
+        if is_source_2:
+            defines.append("META_IS_SOURCE2")
+        am_builder.compiler_add_attrs(CompilerAttrs.DEFINES, *defines)
 
+        hl2sdk_include_paths = [f"{self.hl2sdk_path}\\{path}" for path in manifest_include_paths]
         cxx_include_paths = [
             f"{self.mms_path}\\core",
             f"{self.mms_path}\\core\\sourcehook",
-            f"{self.hl2sdk_path}\\common",
-            f"{self.hl2sdk_path}\\public",
-            f"{self.hl2sdk_path}\\public\\tier0",
-            f"{self.hl2sdk_path}\\public\\tier1",
-            f"{self.hl2sdk_path}\\thirdparty\\protobuf-3.21.8\\src",
+            *hl2sdk_include_paths,
         ]
-        cxx_includes = self.am_builder.parse_paths_str(cxx_include_paths, verify_exists=True)
-        new_am_builder.compiler_add_attrs(CompilerAttrs.CXX_INCLUDES, *cxx_includes)
+        cxx_includes = am_builder.parse_paths_str(cxx_include_paths, verify_exists=True)
+        am_builder.compiler_add_attrs(CompilerAttrs.CXX_INCLUDES, *cxx_includes)
 
-        link_flag_paths = [
-            f"{self.hl2sdk_path}\\lib\\public\\win64\\2015\\libprotobuf.lib",
-            f"{self.hl2sdk_path}\\lib\\public\\win64\\interfaces.lib",
-            f"{self.hl2sdk_path}\\lib\\public\\win64\\tier0.lib",
-            f"{self.hl2sdk_path}\\lib\\public\\win64\\tier1.lib",
-        ]
-        link_flags = self.am_builder.parse_paths_str(link_flag_paths, verify_exists=True)
-        new_am_builder.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, *link_flags)
+        hl2sdk_libs_paths = [f"{self.hl2sdk_path}\\{path}" for path in manifest_libs_paths]
+        link_flags = am_builder.parse_paths_str(hl2sdk_libs_paths, verify_exists=True)
+        am_builder.compiler_add_attrs(CompilerAttrs.LINK_FLAGS, *link_flags)
 
         # Protoc #
-        protoc_include_paths = [f"{self.hl2sdk_path}\\thirdparty\\protobuf-3.21.8\\src", f"{self.hl2sdk_path}\\common"]
-        new_am_builder.add_protoc_includes(protoc_include_paths)
-
-        protoc_source_paths = [f"{self.hl2sdk_path}\\common\\network_connection.proto"]
-        new_am_builder.add_protoc_sources(protoc_source_paths)
+        if "protoc_path" in platform_reqs:
+            am_builder.add_protoc_includes(hl2sdk_include_paths)
+            if is_source_2:
+                protoc_source_paths = [f"{self.hl2sdk_path}\\common\\network_connection.proto"]
+                am_builder.add_protoc_sources(protoc_source_paths)
 
         # Binary #
-        binary_source_paths = [
-            "src\\sample_mm.cpp",  # TODO: Move to am_builder.py
-            f"{self.hl2sdk_path}\\tier1\\convar.cpp",
-            f"{self.hl2sdk_path}\\public\\tier0\\memoverride.cpp",
-        ]
-        new_am_builder.add_binary_sources(binary_source_paths)
+        if is_source_2:
+            binary_source_paths = [
+                "src\\sample_mm.cpp",  # TODO: Move to am_builder.py
+                f"{self.hl2sdk_path}\\tier1\\convar.cpp",
+                f"{self.hl2sdk_path}\\public\\tier0\\memoverride.cpp",
+            ]
+            am_builder.add_binary_sources(binary_source_paths)
 
 
 plugin = MetamodSourcePlugin(builder)
