@@ -8,7 +8,7 @@ PLUGIN_NAME = "cs2-surf"
 PLUGIN_ALIAS = ""
 MMS_PATH = "metamod-source"
 HL2SDK_PATH = "hl2sdk-cs2"
-GAME_NAME = "cs2"
+GAME_NAME = ""
 
 
 if not run.HasAPI(API_VERSION):
@@ -37,17 +37,17 @@ builder.options.add_argument(
     "--hl2sdk_path",
     type=str,
     default=HL2SDK_PATH,
-    help="""The path to the HL2SDK directory. If the path can't be found and --game_name is specified, then a path
-    with both joined together by a hyphen will be search for instead.
+    help="""The path to the HL2SDK directory. If the path can't be found and --game_name is specified, then a path with
+    both joined together by a hyphen will be search for instead.
     """,
 )
 builder.options.add_argument(
     "--game_name",
     type=str,
     default=GAME_NAME,
-    help="""The name of the game this plugin is being built for. This is used when searching for a relevant manifest
-    file and can be empty if the path for the HL2SDK contains a hyphen. If this is specified and the HL2SDK path
-    contains a hyphen, this value will take priority for the game name.
+    help="""The name of the game that this plugin is being built for. This is used when searching for a relevant
+    manifest file and can be empty if the path for the HL2SDK contains a hyphen. If this is specified and the HL2SDK
+    path contains a hyphen, this value will take priority as the game name.
     """,
 )
 builder.Configure()
