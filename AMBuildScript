@@ -8,17 +8,8 @@ from ambuild2.frontend.v2_2.cpp.deptypes import CppNodes
 from ambuild2.frontend.v2_2.tools.protoc import Protoc
 
 
-# TODO: Support multiple binaries by allow list to be created and context based compiler
 # TODO: Add packaging functionality
-# TODO: Dynamically parse from manifest files
-# TODO: Add AMBuilder and PackageScript
-# TODO: Add method to populate base am builder with default values (most likely based on manifest)
-
-
-class BinaryType(StrEnum):
-    PROGRAM = "Program"
-    LIBRARY = "Library"
-    STATIC_LIBRARY = "StaticLibrary"
+# TODO: Add PackageScript
 
 
 class CompilerAttrs(StrEnum):
@@ -45,15 +36,6 @@ class AMBuilder:
 
     def __init__(self, context: BuildContext) -> None:
         self.context = context
-
-    def clone(self, new_context: BuildContext) -> "AMBuilder":
-        """Return a version of this object with the same compiler and protoc objects but a
-        different context and undefined binary.
-        """
-        am_builder = AMBuilder(new_context)
-        am_builder.compiler = self.compiler.clone()
-        am_builder.protoc = self.protoc.clone()
-        return am_builder
 
     def parse_path(self, path: Path | str, verify_exists: bool = False) -> Path:
         """A helper method that makes sure relative paths are based on the current context.
@@ -133,19 +115,19 @@ class AMBuilder:
 
         self.protoc = self.context.DetectProtoc(path=str(protoc_path))
 
-    def set_binary(self, name: str, binary_type: BinaryType) -> None:
+    def set_binary(self, name: str, binary_type: str) -> None:
         """Set the resulting binary type."""
         if name == "":
             raise ValueError("The binary name can't be empty.")
 
-        if binary_type == BinaryType.PROGRAM:
+        if binary_type.casefold() == "program".casefold():
             self.binary = self.compiler.Program(name)
-        elif binary_type == BinaryType.LIBRARY:
+        elif binary_type.casefold() == "library".casefold():
             self.binary = self.compiler.Library(name)
-        elif binary_type == BinaryType.STATIC_LIBRARY:
+        elif binary_type.casefold() == "static_library".casefold():
             self.binary = self.compiler.StaticLibrary(name)
         else:
-            raise ValueError("The binary type must be either a Program, Library, or StaticLibrary.")
+            raise ValueError("The binary type must be either a program, library, or static_library.")
 
         self.compiler = self.binary.compiler
 
@@ -185,43 +167,27 @@ class AMBuilder:
 class MetamodSourcePlugin:
     """A class with variables and functions related to the plugin."""
 
-    am_builder: AMBuilder
+    context: BuildContext
+    nodes: list[CppNodes]
     plugin_name: str
     plugin_alias: str
     mms_path: Path
     hl2sdk_path: Path
     game_name: str
     manifiest_dict: dict
-    nodes: list[CppNodes]
 
     def __init__(self, context: BuildContext) -> None:
-        self.am_builder = self.create_am_builder(context)
-        self.__parse_context_options()
+        self.context = context
         self.nodes = []
-        self.configure_am_builder(self.am_builder, self.plugin_name, BinaryType.LIBRARY)
-        self.set_am_builder_defaults(self.am_builder)
-        self.add_am_builder(self.am_builder)
-
-    def create_am_builder(self, context: BuildContext) -> AMBuilder:
-        """Returns a new AMBuilder object without any values."""
-        return AMBuilder(context)
-
-    def clone_am_builder(self, context: BuildContext) -> AMBuilder:
-        """Returns a clone of the AMBuilder object saved to this class."""
-        return self.am_builder.clone(context)
-
-    def add_am_builder(self, am_builder: AMBuilder) -> None:
-        """Add the binary from an am_builder to the build context."""
-        cpp_node = am_builder.context.Add(am_builder.binary)
-        self.nodes.append(cpp_node)
+        self.__parse_context_options()
 
     def __parse_context_options(self) -> None:
         """A private helper method to parse custom plugin arguments."""
-        plugin_name: str = self.am_builder.context.options.plugin_name
-        plugin_alias: str = self.am_builder.context.options.plugin_alias
-        mms_path_str: str = self.am_builder.context.options.mms_path
-        hl2sdk_path_str: str = self.am_builder.context.options.hl2sdk_path
-        game_name: str = self.am_builder.context.options.game_name
+        plugin_name: str = self.context.options.plugin_name
+        plugin_alias: str = self.context.options.plugin_alias
+        mms_path_str: str = self.context.options.mms_path
+        hl2sdk_path_str: str = self.context.options.hl2sdk_path
+        game_name: str = self.context.options.game_name
 
         plugin_name = plugin_name.strip()
         plugin_alias = plugin_alias.strip()
@@ -238,8 +204,15 @@ class MetamodSourcePlugin:
         if hl2sdk_path_str == "":
             raise ValueError("The path to the HL2SDK directory can't be empty.")
 
-        mms_path = self.am_builder.parse_path(mms_path_str)
-        hl2sdk_path = self.am_builder.parse_path(hl2sdk_path_str)
+        mms_path = Path(mms_path_str)
+        if not mms_path.is_absolute():
+            mms_path = Path(self.context.currentSourcePath, mms_path)
+        mms_path.resolve()
+
+        hl2sdk_path = Path(hl2sdk_path_str)
+        if not hl2sdk_path.is_absolute():
+            hl2sdk_path = Path(self.context.currentSourcePath, hl2sdk_path)
+        hl2sdk_path.resolve()
 
         if game_name == "":
             if hl2sdk_path.name.find("-") == -1:
@@ -279,11 +252,33 @@ class MetamodSourcePlugin:
         self.game_name = game_name
         self.manifiest_dict = manifiest_dict
 
+    def create_empty_am_builder(self, context: BuildContext) -> AMBuilder:
+        """Returns a new AMBuilder object without any values."""
+        return AMBuilder(context)
+
+    def create_am_builder(
+        self,
+        context: BuildContext,
+        binary_name: str,
+        binary_type: str,
+        platform: str = "",
+        arch: str = "",
+        abi: str = "",
+        protoc_path: str = "",
+    ) -> AMBuilder:
+        """Returns a new AMBuilder object that has had its compiler, protoc, and binary variables configured properly
+        according to the manifest file.
+        """
+        am_builder = AMBuilder(context)
+        self.configure_am_builder(am_builder, binary_name, binary_type, platform, arch, abi, protoc_path)
+        self.set_am_builder_defaults(am_builder)
+        return am_builder
+
     def configure_am_builder(
         self,
         am_builder: AMBuilder,
         binary_name: str,
-        binary_type: BinaryType,
+        binary_type: str,
         platform: str = "",
         arch: str = "",
         abi: str = "",
@@ -363,11 +358,16 @@ class MetamodSourcePlugin:
         # Binary #
         if is_source_2:
             binary_source_paths = [
-                "src\\sample_mm.cpp",  # TODO: Move to am_builder.py
                 f"{self.hl2sdk_path}\\tier1\\convar.cpp",
                 f"{self.hl2sdk_path}\\public\\tier0\\memoverride.cpp",
             ]
             am_builder.add_binary_sources(binary_source_paths)
 
+    def add_am_builder(self, am_builder: AMBuilder) -> None:
+        """Add the binary from an am_builder to the build context."""
+        cpp_node = am_builder.context.Add(am_builder.binary)
+        self.nodes.append(cpp_node)
+
 
 plugin = MetamodSourcePlugin(builder)
+plugin.context.Build(["src\\am_builder.py"], {"plugin": plugin})
