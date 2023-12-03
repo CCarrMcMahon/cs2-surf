@@ -8,10 +8,6 @@ from ambuild2.frontend.v2_2.cpp.deptypes import CppNodes
 from ambuild2.frontend.v2_2.tools.protoc import Protoc
 
 
-# TODO: Add packaging functionality
-# TODO: Add PackageScript
-
-
 class CompilerAttrs(StrEnum):
     INCLUDES = "includes"
     CXX_INCLUDES = "cxxincludes"
@@ -256,24 +252,6 @@ class MetamodSourcePlugin:
         """Returns a new AMBuilder object without any values."""
         return AMBuilder(context)
 
-    def create_am_builder(
-        self,
-        context: BuildContext,
-        binary_name: str,
-        binary_type: str,
-        platform: str = "",
-        arch: str = "",
-        abi: str = "",
-        protoc_path: str = "",
-    ) -> AMBuilder:
-        """Returns a new AMBuilder object that has had its compiler, protoc, and binary variables configured properly
-        according to the manifest file.
-        """
-        am_builder = AMBuilder(context)
-        self.configure_am_builder(am_builder, binary_name, binary_type, platform, arch, abi, protoc_path)
-        self.set_am_builder_defaults(am_builder)
-        return am_builder
-
     def configure_am_builder(
         self,
         am_builder: AMBuilder,
@@ -363,6 +341,24 @@ class MetamodSourcePlugin:
             ]
             am_builder.add_binary_sources(binary_source_paths)
 
+    def create_am_builder(
+        self,
+        context: BuildContext,
+        binary_name: str,
+        binary_type: str,
+        platform: str = "",
+        arch: str = "",
+        abi: str = "",
+        protoc_path: str = "",
+    ) -> AMBuilder:
+        """Returns a new AMBuilder object that has had its compiler, protoc, and binary variables configured properly
+        according to the manifest file.
+        """
+        am_builder = self.create_empty_am_builder(context)
+        self.configure_am_builder(am_builder, binary_name, binary_type, platform, arch, abi, protoc_path)
+        self.set_am_builder_defaults(am_builder)
+        return am_builder
+
     def add_am_builder(self, am_builder: AMBuilder) -> None:
         """Add the binary from an am_builder to the build context."""
         cpp_node = am_builder.context.Add(am_builder.binary)
@@ -370,4 +366,4 @@ class MetamodSourcePlugin:
 
 
 plugin = MetamodSourcePlugin(builder)
-plugin.context.Build(["src\\am_builder.py"], {"plugin": plugin})
+plugin.context.Build(["src\\am_builder.py", "packager.py"], {"plugin": plugin})
