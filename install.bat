@@ -1,4 +1,5 @@
 python -m pip install -U pip
 pip install -U setuptools
 pip install -U wheel
-pip install -e .\ambuild\ --exists-action w
+pip install -r requirements.txt --exists-action w
+pre-commit install
