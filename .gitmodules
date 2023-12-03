@@ -1,0 +1,15 @@
+[submodule "hl2sdk-cs2"]
+    path = hl2sdk-cs2
+    url = git@github.com:alliedmodders/hl2sdk.git
+    branch = cs2
+    ignore = dirty
+[submodule "metamod-source"]
+    path = metamod-source
+    url = git@github.com:alliedmodders/metamod-source.git
+    branch = master
+    ignore = dirty
+[submodule "ambuild"]
+    path = ambuild
+    url = git@github.com:alliedmodders/ambuild.git
+    branch = master
+    ignore = dirty
