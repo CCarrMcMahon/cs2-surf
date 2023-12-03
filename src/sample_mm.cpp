@@ -6,7 +6,7 @@
  * ======================================================
  *
  * This software is provided 'as-is', without any express or implied warranty.
- * In no event will the authors be held liable for any damages arising from 
+ * In no event will the authors be held liable for any damages arising from
  * the use of this software.
  *
  * This sample plugin is public domain.
@@ -108,7 +108,7 @@ bool SamplePlugin::Unload(char *error, size_t maxlen)
 
 void SamplePlugin::AllPluginsLoaded()
 {
-	/* This is where we'd do stuff that relies on the mod or other plugins 
+	/* This is where we'd do stuff that relies on the mod or other plugins
 	 * being initialized (for example, cvars added and events registered).
 	 */
 }
