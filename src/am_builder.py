@@ -6,7 +6,7 @@ context: BuildContext = builder
 am_builder = plugin.create_am_builder(context, plugin.plugin_name, "Library")
 
 # Add sources
-am_builder.add_binary_sources(["sample_mm.cpp"])
+am_builder.add_binary_sources(["cs2_surf.cpp"])
 
 # Add am_builder to plugin
 plugin.add_am_builder(am_builder)
