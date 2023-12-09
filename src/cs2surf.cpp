@@ -1,4 +1,4 @@
-#include "cs2_surf.h"
+#include "cs2surf.h"
 
 CS2Surf g_CS2Surf;
 
