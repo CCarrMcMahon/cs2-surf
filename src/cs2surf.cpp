@@ -36,4 +36,4 @@ const char *CS2Surf::GetVersion() { return "v0.0.1-alpha"; }
 
 const char *CS2Surf::GetDate() { return __DATE__; }
 
-const char *CS2Surf::GetLogTag() { return "CS2-SURF"; }
+const char *CS2Surf::GetLogTag() { return "[cs2-surf]"; }
