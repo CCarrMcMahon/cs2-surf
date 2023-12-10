@@ -1,0 +1,15 @@
+---
+BasedOnStyle: LLVM
+AlignConsecutiveMacros: 'true'
+ColumnLimit: '120'
+DerivePointerAlignment: 'false'
+FixNamespaceComments: 'true'
+IndentWidth: '4'
+NamespaceIndentation: All
+PointerAlignment: Right
+SortIncludes: 'true'
+SortUsingDeclarations: 'true'
+TabWidth: '4'
+UseTab: Never
+
+...
