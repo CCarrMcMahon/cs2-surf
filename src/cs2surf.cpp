@@ -1,4 +1,5 @@
 #include "cs2surf.h"
+#include <sqlite3.h>
 
 cs2surf::CS2Surf g_CS2Surf;
 

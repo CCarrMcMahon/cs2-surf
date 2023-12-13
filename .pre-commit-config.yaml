@@ -8,6 +8,9 @@ repos:
       - id: debug-statements
       - id: requirements-txt-fixer
       - id: check-added-large-files
+        args: [
+            "--maxkb=10000"
+        ]
       - id: mixed-line-ending
       - id: check-case-conflict
       - id: check-merge-conflict
