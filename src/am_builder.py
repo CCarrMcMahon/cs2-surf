@@ -9,7 +9,6 @@ am_builder = plugin.create_am_builder(context, plugin.plugin_name, "library")
 include_paths = [
     f"{context.sourcePath}\\include",
     f"{context.sourcePath}\\thirdparty",
-    f"{context.sourcePath}\\thirdparty\\sqlite",
 ]
 includes = am_builder.parse_paths_str(include_paths, verify_exists=True)
 am_builder.compiler_add_attrs("includes", *includes)

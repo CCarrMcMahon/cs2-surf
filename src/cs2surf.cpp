@@ -5,7 +5,7 @@
 
 /* Third Party */
 #include <nlohmann/json.hpp>
-#include <sqlite3.h>
+#include <sqlite/sqlite3.h>
 
 /* Project */
 #include "cs2surf.h"
