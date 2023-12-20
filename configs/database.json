@@ -1,0 +1,21 @@
+{
+    "database": {
+        "type": "sqlite",
+        "sqlite": {
+            "name": "my_sqlite_database",
+            "path": "./data/"
+        },
+        "mysql": {
+            "host": "localhost",
+            "user": "my_user",
+            "password": "my_password",
+            "database": "my_mysql_database"
+        },
+        "postgresql": {
+            "host": "localhost",
+            "user": "my_user",
+            "password": "my_password",
+            "database": "my_postgresql_database"
+        }
+    }
+}

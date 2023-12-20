@@ -20,18 +20,27 @@ for node in plugin.nodes:
 
     # Don't resolve since we need a relative path
     addons_folder = Path("addons")
-    binary_folder = addons_folder
+    plugin_folder = addons_folder.joinpath(binary_alias)
     metamod_folder = addons_folder.joinpath("metamod")
 
+    # Create other necessary folders
+    configs_folder = plugin_folder.joinpath("configs")
+    logs_folder = plugin_folder.joinpath("logs")
+    data_folder = plugin_folder.joinpath("data")
+
     # Create proper package path based on compiler target
+    binary_folder = plugin_folder
     if target.arch == "x86_64":
         if target.platform == "windows":
-            binary_folder = addons_folder.joinpath(f"{binary_alias}\\bin\\win64")
+            binary_folder = binary_folder.joinpath("bin\\win64")
     binary_file_path = binary_folder.joinpath(binary_name)
 
     # Create necessary folders for packaging
     binary_folder_entry = context.AddFolder(str(binary_folder))
     metamod_folder_entry = context.AddFolder(str(metamod_folder))
+    configs_folder_entry = context.AddFolder(str(configs_folder))
+    logs_folder_entry = context.AddFolder(str(logs_folder))
+    data_folder_entry = context.AddFolder(str(data_folder))
 
     # Create vdf file
     vdf_path = Path(f"{context.buildPath}\\{binary_stem}.vdf").resolve()
@@ -45,3 +54,7 @@ for node in plugin.nodes:
     # Copy generated files to correct location in package
     context.AddCopy(binary, binary_folder_entry)
     context.AddCopy(str(vdf_path), metamod_folder_entry)
+
+    # Copy config files to correct location in package
+    database_config_path = Path(f"{context.sourcePath}\\configs\\database.json").resolve()
+    context.AddCopy(str(database_config_path), configs_folder_entry)
