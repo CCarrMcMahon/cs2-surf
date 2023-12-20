@@ -1,5 +1,14 @@
-#include "cs2surf.h"
+/* System */
+#include <string>
+#include <filesystem>
+#include <fstream>
+
+/* Third Party */
+#include <nlohmann/json.hpp>
 #include <sqlite3.h>
+
+/* Project */
+#include "cs2surf.h"
 
 cs2surf::CS2Surf g_CS2Surf;
 
@@ -11,6 +20,32 @@ bool cs2surf::CS2Surf::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxl
     g_SMAPI->AddListener(this, this);
 
     META_CONPRINTF("cs2surf::CS2Surf::Load() Called.\n");
+
+    // Get needed paths
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::filesystem::path baseDir = ismm->GetBaseDir();
+    std::filesystem::path pluginDir = baseDir / "addons/cs2-surf";
+    std::filesystem::path dbCfgFile = pluginDir / "configs/database.json";
+
+    // Open the database.json file.
+    std::ifstream configFile(dbCfgFile.string());
+
+    // Parse the JSON file.
+    nlohmann::json configJson;
+    configFile >> configJson;
+
+    // Get the database configuration.
+    std::string dbType = configJson["database"]["type"];
+    std::string dbName = configJson["database"][dbType]["name"];
+    std::string dbPath = configJson["database"][dbType]["path"];
+
+    // Construct the path to the database file.
+    std::filesystem::path dbFilePath = pluginDir / dbPath / dbName;
+
+    META_CONPRINTF("The path to the database cfg is: %s\n", dbCfgFile.lexically_normal().string().c_str());
+    META_CONPRINTF("Current working directory: %s\n", cwd.lexically_normal().string().c_str());
+    META_CONPRINTF("The path to the database is: %s\n", dbFilePath.lexically_normal().string().c_str());
+
     return true;
 }
 

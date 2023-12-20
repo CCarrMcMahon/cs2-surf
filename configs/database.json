@@ -2,7 +2,7 @@
     "database": {
         "type": "sqlite",
         "sqlite": {
-            "name": "my_sqlite_database",
+            "name": "my_sqlite_database.db",
             "path": "./data/"
         },
         "mysql": {
