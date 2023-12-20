@@ -313,6 +313,9 @@ class MetamodSourcePlugin:
             defines.append("META_IS_SOURCE2")
         am_builder.compiler_add_attrs(CompilerAttrs.DEFINES, *defines)
 
+        cxx_flags = ["/std:c++17", "/EHsc"]
+        am_builder.compiler_add_attrs(CompilerAttrs.CXX_FLAGS, *cxx_flags)
+
         hl2sdk_include_paths = [f"{self.hl2sdk_path}\\{path}" for path in manifest_include_paths]
         cxx_include_paths = [
             f"{self.mms_path}\\core",
