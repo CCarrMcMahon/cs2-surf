@@ -1,4 +1,4 @@
--e ambuild
+-e submodules/ambuild
 
 cfgv==3.4.0
 distlib==0.3.7

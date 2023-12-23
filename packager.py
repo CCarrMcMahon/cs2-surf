@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from ambuild2.frontend.system import System
-from ambuild2.frontend.v2_2.context import BuildContext
-from ambuild2.nodetypes import Entry
+from submodules.ambuild.ambuild2.frontend.system import System
+from submodules.ambuild.ambuild2.frontend.v2_2.context import BuildContext
+from submodules.ambuild.ambuild2.nodetypes import Entry
 
 
 context: BuildContext = builder

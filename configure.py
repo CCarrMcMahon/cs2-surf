@@ -1,14 +1,14 @@
 import sys
 
-from ambuild2 import run
+from submodules.ambuild.ambuild2 import run
 
 
 API_VERSION = "2.2.4"
 
 PLUGIN_NAME = "cs2-surf"
 PLUGIN_ALIAS = ""
-MMS_PATH = "metamod-source"
-HL2SDK_PATH = "hl2sdk-cs2"
+MMS_PATH = "submodules/metamod-source"
+HL2SDK_PATH = "submodules/hl2sdk-cs2"
 GAME_NAME = ""
 
 
