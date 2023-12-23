@@ -1,9 +1,9 @@
-#ifndef CS2SURF_H_INCLUDED
-#define CS2SURF_H_INCLUDED
+#ifndef CS2_SURF_H_INCLUDED
+#define CS2_SURF_H_INCLUDED
 
 #include <ISmmPlugin.h>
 
-namespace cs2surf {
+namespace cs2_surf {
     class CS2Surf : public ISmmPlugin, public IMetamodListener {
       public: // ISmmPlugin (States)
         bool Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late) override;
@@ -24,10 +24,10 @@ namespace cs2surf {
                          char const *pLandmarkName, bool loadGame, bool background) override;
         void OnLevelShutdown() override;
     };
-} // namespace cs2surf
+} // namespace cs2_surf
 
-extern cs2surf::CS2Surf g_CS2Surf;
+extern cs2_surf::CS2Surf g_CS2Surf;
 
 PLUGIN_GLOBALVARS();
 
-#endif // CS2SURF_H_INCLUDED
+#endif // CS2_SURF_H_INCLUDED

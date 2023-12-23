@@ -1,0 +1,7 @@
+{
+    "sqlite": {
+        "path": "./data/",
+        "name": "sqlite_database.db",
+        "schema": "sqlite_schema.sql"
+    }
+}

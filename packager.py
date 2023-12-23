@@ -56,5 +56,8 @@ for node in plugin.nodes:
     context.AddCopy(str(vdf_path), metamod_folder_entry)
 
     # Copy config files to correct location in package
-    database_config_path = Path(f"{context.sourcePath}\\configs\\database.json").resolve()
-    context.AddCopy(str(database_config_path), configs_folder_entry)
+    databases_config_path = Path(f"{context.sourcePath}\\configs\\databases.json").resolve()
+    context.AddCopy(str(databases_config_path), configs_folder_entry)
+
+    settings_config_path = Path(f"{context.sourcePath}\\configs\\settings.json").resolve()
+    context.AddCopy(str(settings_config_path), configs_folder_entry)

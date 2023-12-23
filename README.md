@@ -1,4 +1,4 @@
-# CS2-Surf
+# CS2 Surf
 
 ## Description
 
