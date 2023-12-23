@@ -51,13 +51,17 @@ for node in plugin.nodes:
         f.write(f'\t"file"\t"{binary_file_path}"\n')
         f.write("}\n")
 
-    # Copy generated files to correct location in package
+    # Copy generated files
     context.AddCopy(binary, binary_folder_entry)
     context.AddCopy(str(vdf_path), metamod_folder_entry)
 
-    # Copy config files to correct location in package
+    # Copy config files
     databases_config_path = Path(f"{context.sourcePath}\\configs\\databases.json").resolve()
     context.AddCopy(str(databases_config_path), configs_folder_entry)
 
     settings_config_path = Path(f"{context.sourcePath}\\configs\\settings.json").resolve()
     context.AddCopy(str(settings_config_path), configs_folder_entry)
+
+    # Copy data files
+    database_schema_path = Path(f"{context.sourcePath}\\data\\sqlite_schema.sql").resolve()
+    context.AddCopy(str(database_schema_path), data_folder_entry)
