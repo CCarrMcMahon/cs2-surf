@@ -34,6 +34,3 @@ MANIFEST
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
-
-# Submodules
-submodules/ambuild/AMBuild.egg-info/
