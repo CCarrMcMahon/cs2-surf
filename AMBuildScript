@@ -1,11 +1,11 @@
 from enum import StrEnum
 from pathlib import Path
 import json
-from submodules.ambuild.ambuild2.frontend.v2_2.context import BuildContext
-from submodules.ambuild.ambuild2.frontend.v2_2.cpp.builders import BinaryBuilder
-from submodules.ambuild.ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
-from submodules.ambuild.ambuild2.frontend.v2_2.cpp.deptypes import CppNodes
-from submodules.ambuild.ambuild2.frontend.v2_2.tools.protoc import Protoc
+from ambuild2.frontend.v2_2.context import BuildContext
+from ambuild2.frontend.v2_2.cpp.builders import BinaryBuilder
+from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
+from ambuild2.frontend.v2_2.cpp.deptypes import CppNodes
+from ambuild2.frontend.v2_2.tools.protoc import Protoc
 
 
 class CompilerAttrs(StrEnum):

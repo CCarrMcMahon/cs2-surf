@@ -1,4 +1,4 @@
-from submodules.ambuild.ambuild2.frontend.v2_2.context import BuildContext
+from ambuild2.frontend.v2_2.context import BuildContext
 
 
 # Create am_builder for this context
