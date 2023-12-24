@@ -16,8 +16,7 @@ Run to following commands to build this plugin.
 2. `.\.venv\Scripts\Activate.ps1`
 3. `.\install.bat`
 4. `python .\configure.py --out build`
-5. `cd .\build\`
-6. `ambuild`
+5. `ambuild build`
 
 ## Installation
 
